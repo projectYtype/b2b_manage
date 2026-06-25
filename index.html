@@ -33,7 +33,7 @@
     /** @jsxRuntime classic */
     /** @jsx React.createElement */
     /** @jsxFrag React.Fragment */    
-// import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    // import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     // import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     // import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -85,8 +85,7 @@
     
     // --- 구글 시트 연동 URL (★ 새로 배포한 URL로 교체하세요!) ---
     const GAS_URL ='https://script.google.com/macros/s/AKfycbxO3gHGZbsBmjaX-hfFHP-s7trR6OEKj_Rw-3G5-B0ehMOC3JTl1h2r7rEF8M3XmsqO/exec';
-const LOG_GAS_URL = 'https://script.google.com/macros/s/AKfycbysxK0dstH8fLOOoctqaix404KNjOktAOMQ7oWUwv6bAQR58EBk48tzOAzk5Wee82ryEQ/exec';
-
+    const LOG_GAS_URL = 'https://script.google.com/macros/s/AKfycbysxK0dstH8fLOOoctqaix404KNjOktAOMQ7oWUwv6bAQR58EBk48tzOAzk5Wee82ryEQ/exec';
 
     // --- 공통 컴포넌트 ---
     const MobileScrollHint = () => (
@@ -154,6 +153,10 @@ const LOG_GAS_URL = 'https://script.google.com/macros/s/AKfycbysxK0dstH8fLOOoctq
       const [myPwModal, setMyPwModal] = useState({ isOpen: false, newPw: '' });
       // [수정] 아이디/비밀번호 모두 수정 가능한 모달 상태
       const [editAccModal, setEditAccModal] = useState({ isOpen: false, oldUsername: '', newUsername: '', newPw: '' });
+      
+      // 💡 [에러 해결!] 빠져있던 비밀번호 전용 수정 모달 상태값을 복구했습니다.
+      const [editPwAccModal, setEditPwAccModal] = useState({ isOpen: false, username: '', newPw: '' });
+
       // [추가] 계정 다중 선택 상태
       const [selectedAccountIds, setSelectedAccountIds] = useState([]);
 
@@ -180,7 +183,7 @@ const LOG_GAS_URL = 'https://script.google.com/macros/s/AKfycbysxK0dstH8fLOOoctq
       // --- 모든 행사 데이터를 관리하는 메모리 저장소 ---
       const [eventsDB, setEventsDB] = useState({});
 
-const [eventId, setEventId] = useState('');
+      const [eventId, setEventId] = useState('');
       const [isDataLoaded, setIsDataLoaded] = useState(false);
       const isRemoteUpdate = useRef(false); // 🌟 원격 업데이트 자동반사 방지용 플래그
       const lastFetchTime = useRef(0);      // 🕒 [추가] 좀비 부활 방지용 원격 다운로드 시점 체커
@@ -690,8 +693,7 @@ const [eventId, setEventId] = useState('');
         setDistSelectedIds([]);
         showAlert('배포 취소 처리', '선택한 항목들의 배포 상태가 초기화(미배포) 되었습니다.');
       };
-
-      const handleBulkSave = () => {
+const handleBulkSave = () => {
         const rows = bulkText.split('\n').filter(r => r.trim());
         
         if (bulkModal.type === 'companies') {
@@ -1061,6 +1063,22 @@ const [eventId, setEventId] = useState('');
           showAlert('완료', '계정 정보가 성공적으로 변경되었습니다.');
       };
 
+      // 💡 [수정] 모달에서 사용하는 개별 비밀번호 변경 함수 (에러 원인 해결)
+      const handleEditAccPw = () => {
+          const { username, newPw } = editPwAccModal;
+          if (!newPw) return showAlert('오류', '새 비밀번호를 입력해주세요.');
+          
+          const newAccounts = accountsDB.map(a => {
+              if (a.username === username) {
+                  return { ...a, password: newPw };
+              }
+              return a;
+          });
+          saveAccounts(newAccounts);
+          setEditPwAccModal({ isOpen: false, username: '', newPw: '' });
+          showAlert('완료', '해당 계정의 비밀번호가 성공적으로 변경되었습니다.');
+      };
+
       const deleteSelectedAccounts = () => {
           if (selectedAccountIds.length === 0) return;
           showConfirm('선택 계정 삭제', `선택한 ${selectedAccountIds.length}개의 계정을 정말 삭제하시겠습니까?`, () => {
@@ -1131,13 +1149,21 @@ const [eventId, setEventId] = useState('');
         }
       };
 
-const deleteWalkInMatch = (wm) => {
+      // 💡 [수정] 포맷이 꼬여있던 현장 매칭 기록 삭제 함수를 깔끔하게 분리
+      const deleteWalkInMatch = (wmOrId) => {
         if(confirm('이 현장 매칭 기록을 완전히 삭제하시겠습니까?')) {
             const newEv = JSON.parse(JSON.stringify(eventsDB[eventId]));
             
+            // wm 객체가 오거나 id 문자열이 올 수 있도록 방어 코드 작성
+            const wm = typeof wmOrId === 'string' 
+                ? walkInMatches.find(w => w.id === wmOrId) 
+                : wmOrId;
+
+            if (!wm) return;
+            
             if (wm.isFromMatches) {
-              if (newEv.matches?.[wm.dayIdx]?.[wm.timeKey]) {
-                delete newEv.matches[wm.dayIdx][wm.timeKey];
+              if (newEv.matches?.[wm.dayIdx]?.[wm.timeKey]?.[wm.companyId]) {
+                delete newEv.matches[wm.dayIdx][wm.timeKey][wm.companyId];
               }
               if (newEv.liveStatus?.[wm.dayIdx]?.[wm.timeKey]) {
                 delete newEv.liveStatus[wm.dayIdx][wm.timeKey];
@@ -1168,7 +1194,9 @@ const deleteWalkInMatch = (wm) => {
             }
             alert('현장 매칭 기록이 삭제되었습니다.');
         }
-      };const handleTableSave = () => {
+      };
+
+      const handleTableSave = () => {
         if (!tableAssignModal.targetId) {
           showAlert('알림', '테이블에 고정 배치할 대상을 선택해주세요.');
           return;
@@ -1441,8 +1469,7 @@ const deleteWalkInMatch = (wm) => {
            showAlert('복사 완료', 'Apps Script 코드가 클립보드에 복사되었습니다.');
         }
       };
-
-      // --- Render Functions (아래는 이전과 모두 동일) ---
+// --- Render Functions (아래는 이전과 모두 동일) ---
       const renderSetupTab = () => (
         <div className="space-y-6 w-full max-w-3xl bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 mx-auto">
           <h2 className="text-lg sm:text-xl font-bold flex items-center text-gray-800 mb-4 sm:mb-6 border-b pb-3 sm:pb-4">
@@ -1713,7 +1740,7 @@ const deleteWalkInMatch = (wm) => {
         const buyerTimeMatch = {}; 
         buyers.forEach(b => buyerTimeMatch[b.id] = {});
 
-config.dates.forEach((_, dayIdx) => {
+        config.dates.forEach((_, dayIdx) => {
           timeSlots.forEach(slot => {
             const timeMatches = matches[dayIdx]?.[slot.value] || {};
             const currentLiveStatuses = liveStatus[dayIdx]?.[slot.value] || {};
@@ -1742,11 +1769,11 @@ config.dates.forEach((_, dayIdx) => {
         });
 
 
-     const validWalkInMatches = walkInMatches.filter(wm => 
-  companies.some(c => c.id === wm.companyId) && 
-  buyers.some(b => b.id === wm.buyerId)
-);
-const totalMatchesCount = totalMeetings + validWalkInMatches.length;
+        const validWalkInMatches = walkInMatches.filter(wm => 
+          companies.some(c => c.id === wm.companyId) && 
+          buyers.some(b => b.id === wm.buyerId)
+        );
+        const totalMatchesCount = totalMeetings + validWalkInMatches.length;
 
         return (
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 w-full overflow-hidden">
@@ -1970,8 +1997,7 @@ const totalMatchesCount = totalMeetings + validWalkInMatches.length;
           </div>
         );
       };
-
-      const renderExportTab = () => {
+const renderExportTab = () => {
         const buildTbodyHTML = () => {
           if (!exportTargetId) return '';
           let html = '';
@@ -2200,7 +2226,7 @@ const totalMatchesCount = totalMeetings + validWalkInMatches.length;
                                           {buyers.map(b => {
                                             const isBooked = Object.values(timeMatches).includes(b.id) && timeMatches[currentTarget.id] !== b.id;
                                             return <option key={b.id} value={b.id} disabled={isBooked}>{b.company} ({b.name}) {isBooked ? '- [타 기업과 매칭됨]' : ''}</option>
-                                          })}
+                                            })}
                                         </select>
                                       ) : (
                                         <select
@@ -2387,9 +2413,6 @@ const totalMatchesCount = totalMeetings + validWalkInMatches.length;
                     </div>
                   )}
                 </div>
-
-               {/* 기존 현장 매칭 내역 부분 삭제됨 (아래 onsite 탭으로 이동) */}
-
               </div>
             )}
 
@@ -2571,7 +2594,7 @@ const totalMatchesCount = totalMeetings + validWalkInMatches.length;
               </div>
             )}
 
-{liveSubTab === 'onsite' && (
+            {liveSubTab === 'onsite' && (
               <div className="flex-1 bg-orange-50 border border-orange-200 rounded-2xl p-6 overflow-hidden flex flex-col mt-6">
                 {(() => {
                    const combinedWalkIns = [...(walkInMatches || [])];
@@ -3337,7 +3360,7 @@ const totalMatchesCount = totalMeetings + validWalkInMatches.length;
                           <th className="p-2 sm:p-3 bg-gray-100 min-w-[150px]">{isComp ? '매칭할 바이어' : '매칭할 기업'}</th>
                         </tr>
                       </thead>
-<tbody>
+                      <tbody>
                         {config.dates.map((dateStr, dayIdx) => {
                           let lastEndTime = null;
                           return (
