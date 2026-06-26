@@ -723,9 +723,9 @@ const handleBulkSave = () => {
               const cols = r.split('\t').map(s => s.trim());
               if (cols.length < 3) return; 
               
-              const targetEventName = cols[0];
-              const accId = cols[1];
-              const accPw = cols[2];
+              const accId = cols[0];
+              const accPw = cols[1];
+              const targetEventName = cols[2];
               const targetName = cols[3] || '';
 
               if (!accId || !accPw) return;
@@ -2648,7 +2648,7 @@ const renderExportTab = () => {
                                <th className="p-3 font-bold text-orange-900">바이어 정보</th>
                                <th className="p-3 font-bold text-orange-900">매칭된 기업 (부스)</th>
                                <th className="p-3 font-bold text-orange-900">상담 내용 / 적합도</th>
-                               <th className="p-3 font-bold text-orange-900">금액 (상담/추진/계약)</th>
+                              <th className="p-3 font-bold text-orange-900">금액 (상담/추진/계약)</th>
                              </tr>
                            </thead>
                            <tbody>
@@ -2671,11 +2671,6 @@ const renderExportTab = () => {
                                      </>
                                    ) : (
                                      <td colSpan="2" className="p-3 text-xs text-gray-400 text-center bg-gray-50/50">🔒 상세 일지 비공개</td>
-                                   )}
-                                   {loginUser?.role === 'admin' && (
-                                     <td className="p-3 text-center">
-                                        <button onClick={() => deleteWalkInMatch(wm)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="삭제"><IconTrash2 size={16}/></button>
-                                     </td>
                                    )}
                                  </tr>
                                )
@@ -2725,17 +2720,29 @@ const renderExportTab = () => {
         );
       };
 
-      const renderAccountsTab = () => (
+const renderAccountsTab = () => (
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 w-full overflow-hidden">
-          <div className="mb-4 sm:mb-6 border-b pb-4">
-            <h2 className="text-lg sm:text-xl font-bold flex items-center text-gray-800">
-              <IconShield className="mr-2 text-indigo-600" size={24} /> 모든 계정 권한 관리
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-2">클라이언트(발주처) 및 다른 관리자가 로그인하여 시스템을 이용할 수 있도록 계정을 생성하고 권한을 부여합니다.</p>
+          <div className="mb-4 sm:mb-6 border-b pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold flex items-center text-gray-800">
+                <IconShield className="mr-2 text-indigo-600" size={24} /> 모든 계정 권한 관리
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">클라이언트(발주처) 및 통역사 등이 로그인하여 시스템을 이용할 수 있도록 계정을 생성하고 권한을 부여합니다.</p>
+            </div>
+            <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+              {selectedAccountIds.length > 0 && (
+                <button onClick={deleteSelectedAccounts} className="px-4 py-2 bg-red-500 text-white text-sm font-bold rounded-md hover:bg-red-600 transition shadow-sm whitespace-nowrap">
+                  선택 삭제 ({selectedAccountIds.length})
+                </button>
+              )}
+              <button onClick={() => setBulkModal({ isOpen: true, type: 'accounts' })} className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 transition text-sm font-bold shadow-sm whitespace-nowrap">
+                <IconClipboardList size={16} className="mr-2" /> 엑셀 대량 등록
+              </button>
+            </div>
           </div>
 
           <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 mb-6 sm:mb-8">
-            <h3 className="font-bold text-gray-700 mb-3 sm:mb-4 text-sm sm:text-base">새 계정 생성</h3>
+            <h3 className="font-bold text-gray-700 mb-3 sm:mb-4 text-sm sm:text-base">새 계정 낱개 생성</h3>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-wrap">
                 <label className="flex items-center cursor-pointer text-sm sm:text-base"><input type="radio" checked={accForm.role === 'client'} onChange={()=>setAccForm({...accForm, role: 'client'})} className="mr-2 w-4 h-4 text-indigo-600" /> 발주처 (지정된 행사만 접근)</label>
@@ -2751,31 +2758,38 @@ const renderExportTab = () => {
           </div>
 
           <div className="space-y-4 sm:space-y-6">
-            <h3 className="font-bold text-gray-700 text-base sm:text-lg border-b pb-2">등록된 계정 목록</h3>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-gray-700 text-base sm:text-lg">등록된 계정 목록</h3>
+              <label className="flex items-center cursor-pointer text-sm text-gray-600 font-bold">
+                <input type="checkbox" checked={accountsDB.length > 0 && selectedAccountIds.length === accountsDB.length} onChange={(e) => e.target.checked ? setSelectedAccountIds(accountsDB.map(a => a.username)) : setSelectedAccountIds([])} className="w-4 h-4 mr-2 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer" /> 전체 선택
+              </label>
+            </div>
             {accountsDB.map(acc => {
               const isAdmin = acc.role === 'admin';
               const isInterpreter = acc.role === 'interpreter';
+              const isSelected = selectedAccountIds.includes(acc.username);
               return (
-              <div key={acc.username} className={`p-4 sm:p-5 border rounded-lg bg-white shadow-sm flex flex-col gap-3 sm:gap-4 ${isAdmin ? 'border-purple-200' : isInterpreter ? 'border-green-200' : 'border-indigo-100'}`}>
+              <div key={acc.username} className={`p-4 sm:p-5 border rounded-lg shadow-sm flex flex-col gap-3 sm:gap-4 transition-all ${isSelected ? 'ring-2 ring-indigo-400 bg-indigo-50/40' : 'bg-white'} ${isAdmin ? 'border-purple-200' : isInterpreter ? 'border-green-200' : 'border-indigo-100'}`}>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-3 gap-3">
                   <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <input type="checkbox" checked={isSelected} onChange={() => setSelectedAccountIds(prev => prev.includes(acc.username) ? prev.filter(id => id !== acc.username) : [...prev, acc.username])} className="w-5 h-5 cursor-pointer rounded text-indigo-600 mr-1" />
                     <span className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold border ${isAdmin ? 'bg-purple-100 text-purple-700 border-purple-200' : isInterpreter ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
                         {isAdmin ? '관리자' : isInterpreter ? '통역사' : '발주처'}
                     </span>
                     <span className="font-bold text-lg sm:text-xl text-gray-900">{acc.username}</span>
-                    <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded border mt-1 sm:mt-0">PW: {acc.password}</span>
+                    <span className="text-xs sm:text-sm text-gray-500 bg-white px-2 py-1 rounded border mt-1 sm:mt-0">PW: {acc.password}</span>
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button onClick={() => setEditPwAccModal({ isOpen: true, username: acc.username, newPw: acc.password })} className="flex-1 sm:flex-none justify-center text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-bold flex items-center px-3 py-2 bg-blue-50 rounded transition border border-blue-100">
-                      비밀번호 변경
+                  <div className="flex items-center gap-2 w-full sm:w-auto pl-8 sm:pl-0">
+                    <button onClick={() => setEditAccModal({ isOpen: true, oldUsername: acc.username, newUsername: acc.username, newPw: acc.password })} className="flex-1 sm:flex-none justify-center text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-bold flex items-center px-3 py-2 bg-blue-50 rounded transition border border-blue-100 whitespace-nowrap">
+                      정보(ID/PW) 수정
                     </button>
-                    <button onClick={() => deleteAccount(acc.username)} className="flex-1 sm:flex-none justify-center text-red-500 hover:text-red-700 text-xs sm:text-sm font-bold flex items-center px-3 py-2 bg-red-50 rounded transition border border-red-100">
+                    <button onClick={() => deleteAccount(acc.username)} className="flex-1 sm:flex-none justify-center text-red-500 hover:text-red-700 text-xs sm:text-sm font-bold flex items-center px-3 py-2 bg-red-50 rounded transition border border-red-100 whitespace-nowrap">
                       <IconTrash2 size={16} className="mr-1"/> 계정 삭제
                     </button>
                   </div>
                 </div>
                 {(!isAdmin && !isInterpreter) && (
-                  <div>
+                  <div className="pl-8 sm:pl-0">
                     <p className="text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-3">이 계정이 접근 가능한 행사 선택 (체크된 행사만 볼 수 있습니다)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded border custom-scrollbar">
                       {Object.values(eventsDB).map(ev => {
@@ -2792,7 +2806,7 @@ const renderExportTab = () => {
                   </div>
                 )}
                 {isInterpreter && (
-                  <div>
+                  <div className="pl-8 sm:pl-0">
                     <p className="text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-3">이 계정에 배정할 기업 또는 바이어 선택 (행사별 1개 대상 배정)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-h-60 overflow-y-auto p-2 bg-gray-50 rounded border custom-scrollbar">
                       {Object.values(eventsDB).map(ev => {
@@ -2830,7 +2844,7 @@ const renderExportTab = () => {
                   </div>
                 )}
                 {isAdmin && (
-                  <p className="text-xs sm:text-sm text-gray-500 bg-gray-50 p-2 sm:p-3 rounded">💡 관리자 계정은 시스템의 모든 행사에 접근하고, 새로운 행사를 생성하거나 삭제할 수 있습니다.</p>
+                  <p className="text-xs sm:text-sm text-gray-500 bg-gray-50 p-2 sm:p-3 rounded pl-8 sm:pl-3">💡 관리자 계정은 시스템의 모든 행사에 접근하고, 새로운 행사를 생성하거나 삭제할 수 있습니다.</p>
                 )}
               </div>
             )})}
@@ -2839,6 +2853,7 @@ const renderExportTab = () => {
         </div>
       );
 
+            {accountsDB.length 
       const renderInterpreterTab = () => {
         const targetInfo = loginUser?.assignedTargets?.[eventId];
         if (!targetInfo) {
@@ -3181,7 +3196,6 @@ const renderExportTab = () => {
                                                         consultAmount: wm.result.consultAmount || '', promoAmount: wm.result.promoAmount || '', contractAmount: wm.result.contractAmount || ''
                                                     });
                                                 }} className="px-2 py-1 text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded text-xs font-bold" title="내용 수정">수정</button>
-                                                <button onClick={() => deleteWalkInMatch(wm.id)} className="px-2 py-1 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded text-xs font-bold" title="삭제">삭제</button>
                                             </td>
                                         </tr>
                                     )
@@ -3624,8 +3638,10 @@ const renderExportTab = () => {
                       </div>
                     </div>
                     {bulkModal.type === 'companies' 
-                      ? <p className="bg-gray-100 p-2 rounded">복사할 열 순서: <strong>기업명 | 부스번호 | 관련 분야 | 이메일 | 연락처</strong> (총 5열)</p>
-                      : <p className="bg-gray-100 p-2 rounded">복사할 열 순서: <strong>국가 | 회사명 | 이름 | 관심 분야 | 희망기업(쉼표구분) | 참여가능일차(쉼표구분) | 이메일 | 연락처</strong> (총 8열)</p>
+                      ? <p className="bg-gray-100 p-2 rounded text-sm">복사할 열 순서: <strong>기업명 | 부스번호 | 관련 분야 | 이메일 | 연락처</strong> (총 5열)</p>
+                      : bulkModal.type === 'buyers'
+                        ? <p className="bg-gray-100 p-2 rounded text-sm">복사할 열 순서: <strong>국가 | 회사명 | 이름 | 관심 분야 | 희망기업(쉼표구분) | 참여가능일차(쉼표구분) | 이메일 | 연락처</strong> (총 8열)</p>
+                        : <p className="bg-gray-100 p-2 rounded text-sm">복사할 열 순서: <strong>아이디 | 비밀번호 | 접속 권한을 줄 행사명 | (선택) 배정할 타겟 기업/바이어 이름</strong> (총 4열)</p>
                     }
                   </div>
                   <textarea 
@@ -3655,6 +3671,31 @@ const renderExportTab = () => {
                 <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
                   <button onClick={() => setMyPwModal({ isOpen: false, newPw: '' })} className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 font-medium text-sm">취소</button>
                   <button onClick={handleMyPwChange} className="px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-bold shadow-sm text-sm">변경 저장</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 계정 아이디/비밀번호 수정 모달 */}
+          {editAccModal.isOpen && (
+            <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+                <div className="p-4 border-b bg-gray-50 flex items-center">
+                  <h3 className="font-bold text-lg text-gray-800">[{editAccModal.oldUsername}] 정보 수정</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">변경할 아이디 (ID)</label>
+                    <input type="text" value={editAccModal.newUsername} onChange={e=>setEditAccModal({...editAccModal, newUsername: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500" placeholder="새 아이디 입력" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">변경할 비밀번호 (Password)</label>
+                    <input type="text" value={editAccModal.newPw} onChange={e=>setEditAccModal({...editAccModal, newPw: e.target.value})} className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500" placeholder="새 비밀번호 입력" />
+                  </div>
+                </div>
+                <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
+                  <button onClick={() => setEditAccModal({ isOpen: false, oldUsername: '', newUsername: '', newPw: '' })} className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 font-medium text-sm">취소</button>
+                  <button onClick={handleEditAcc} className="px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-bold shadow-sm text-sm">변경 저장</button>
                 </div>
               </div>
             </div>
